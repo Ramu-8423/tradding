@@ -43,6 +43,7 @@ route::get('/popup_modal',[PublicApiController::class,'popup_modal']);
 
 route::get('/how_to_play',[PublicApiController::class,'how_to_play']);
 route::get('/salary',[PublicApiController::class,'salary']);
+route::get('/version',[PublicApiController::class,'version']);
 
 route::get('/notifications',[PublicApiController::class,'notifications']);
 Route::get('/commission_details',[PublicApiController::class,'commission_details']);
@@ -142,6 +143,7 @@ route::get('/wallet_histories/{id}',[PublicApiController::class,'wallet_historie
 
 route::post('/change_password',[PublicApiController::class,'change_password']);
 
+route::get('/tradding_result_api/{gameid}',[TraddingResultController::class,'tradding_result_api']);
 
 
 

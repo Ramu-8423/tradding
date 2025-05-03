@@ -16,19 +16,9 @@
   
   <!-- Custom style CSS -->
   <link rel="stylesheet" href="{{ asset('assets/css/custom.css') }}">
-  <link rel='shortcut icon' type='image/x-icon' href="{{ asset('assets/img/favicon.ico') }}" />
+  <link rel='shortcut icon' type='image/x-icon' href="{{ asset('assets/img/logo.png') }}" />
+
   <style>
-     .settingSidebar .settingPanelToggle {
-    background: #6777ef;
-    padding: 10px 15px;
-    color: #fff;
-    position: absolute;
-    top:70%;
-    left: -40px;
-    width:10px;
-    border-radius: 10px 0 0 10px;
-  </style>
-          <style>
        th{
     white-space: nowrap; 
   
@@ -100,7 +90,7 @@
          </div>  
       <footer class="main-footer">
         <div class="footer-left">
-          <a href="templateshub.net">𝓜𝓐𝓗𝓐𝓙𝓞𝓝𝓖</a>
+          <a href="templateshub.net">Templateshub</a>
         </div>
         <div class="footer-right"></div>
       </footer>
@@ -109,7 +99,7 @@
 <script>
     setTimeout(() => {
         document.querySelectorAll(".alert").forEach(alert => alert.remove());
-    }, 3000); // 3 seconds delay
+    }, 10000); // 10 seconds delay
 </script>
   <!-- General JS Scripts -->
   <script src="{{ asset('assets/js/app.min.js') }}"></script>

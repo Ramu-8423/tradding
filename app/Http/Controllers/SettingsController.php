@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Http;
 class SettingsController extends Controller
 {
      public function Transaction_limit(){
-          $limits = DB::table('business_settings')->whereIN('id', [15,16,17,18])->get();
+          $limits = DB::table('business_settings')->whereIN('id', [15,16,17,18,20])->get();
           return view('manualpayment.Transaction_limit')->with('limits', $limits);
       }
       

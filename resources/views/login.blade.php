@@ -97,6 +97,7 @@
 
 <!-- LOGIN FORM -->
 <div class="login-box">
+		
     <form method="POST" action="{{ route('admin.login.submit') }}">
         @csrf
 
@@ -105,7 +106,11 @@
         @if(session('error'))
             <div class="alert alert-danger">{{ session('error') }}</div>
         @endif
-
+		@if(session('msg'))
+			<div style="color: red; font-weight: bold;">
+				{{ session('msg') }}
+			</div>
+		@endif
         <label for="username" class="form-label">Username</label>
         <input type="text" name="username" placeholder="Username" id="username" class="form-control" required>
 

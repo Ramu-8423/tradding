@@ -61,8 +61,12 @@ class VendorActivityController extends Controller
 }
 
   public function updatevendor($id){
+	    $user = session('admin_user');
+        $role_id =  $user->role_id;
+	  if($role_id == 2 || $role_id ==3){
+		  $id =  $user->id;
+	  }
     $vendor = DB::table('users')->where('id', $id)->first();
-
     if (!$vendor) {
         return redirect()->back()->with('error', 'Vendor not found.');
     }
@@ -134,20 +138,30 @@ class VendorActivityController extends Controller
        $find = DB::table('vendor_request')->where('id', $id)->first();
        $userid = $find->user_id;
 	   $vendor_id = $find->vendor_id;
+
+	   
        $userinfo = DB::table('users')->where('id', $userid)->first();
+	   $referrer_id = $userinfo->referrer_id ?? null;
+	   $first_recharge = $userinfo->first_recharge;
+	  
        $request_amount = $find->request_amount;
        $commission = ($request_amount * 8) / 100;
+	   $lifetime_bonus = ($request_amount * 3) / 100;
+	   $refer_bonus = ($request_amount * 6) / 100;
+	   $first_bonus = ($request_amount * 10) / 100;
        $vendoramount = DB::table('users')->where('id', $vendor_id)->value('wallet');
-     
        if($request_amount < $vendoramount){
-          
-          $vendordecrement = DB::table('users')->where('id', $vendor_id)->decrement('wallet', $request_amount);
-          $userincrement = DB::table('users')->where('id', $userid)->increment('wallet', $request_amount);
+         $vendordecrement = DB::table('users')->where('id', $vendor_id)->decrement('wallet', $request_amount);
+         $userincrement = DB::table('users')
+			->where('id', $userid)
+			->update([
+				'wallet' => DB::raw("wallet + $request_amount"),
+				'total_payin' => DB::raw("total_payin + $request_amount"),
+			]);
           $vendorbonus = DB::table('users')->where('id', $vendor_id)->increment('commission', $commission);
           $update = DB::table('vendor_request')->where('id', $id)->update([
               'status' => $ststus
               ]);
-		   
           $Transferred_history = DB::table('wallet_histories')->insert([
 							"user_id" => $vendor_id,
 							"amount"  => $request_amount,
@@ -168,7 +182,51 @@ class VendorActivityController extends Controller
                 "type_id" => "33",
                 "description" => "Amount received from vendor"
                 ]);
-		   
+		  if ($first_recharge == 1) {
+					DB::table('users')
+						->where('id', $userid)
+						->update([
+							'bonus' => DB::raw("bonus + $first_bonus"),
+							'first_recharge' => 0
+						]);
+
+					if ($referrer_id !== null) {
+						DB::table('users')
+							->where('id', $referrer_id)
+							->update([
+								'bonus' => DB::raw("bonus + $refer_bonus")
+							]);
+
+						DB::table('wallet_histories')->insert([
+							"user_id" => $referrer_id,
+							"amount" => $refer_bonus,
+							"type_id" => "30",
+							"description" => "Referral Bonus"
+						]);
+					}
+
+					DB::table('wallet_histories')->insert([
+						"user_id" => $userid,
+						"amount" => $first_bonus,
+						"type_id" => "37",
+						"description" => "First recharge bonus"
+					]);
+				} else {
+					DB::table('users')
+						->where('id', $userid)
+						->update([
+							'bonus' => DB::raw("bonus + $lifetime_bonus")
+						]);
+
+					DB::table('wallet_histories')->insert([
+						"user_id" => $userid,
+						"amount" => $lifetime_bonus,
+						"type_id" => "30",
+						"description" => "Lifetime Bonus"
+					]);
+				}
+
+		    return back()->with('success', 'Transferred  Successfully'); 
        }else{
           return back()->with('error', 'Vendor Insufficient balance for the user');  
        }

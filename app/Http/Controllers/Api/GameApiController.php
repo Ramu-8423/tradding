@@ -15,7 +15,7 @@ class GameApiController extends Controller{
     $now = \Carbon\Carbon::now('Asia/Kolkata');
     $currentTime = $now->format('H:i'); // HH:mm format
     $today = \Carbon\Carbon::today('Asia/Kolkata')->toDateString();
-    $data = DB::table('game')->get();
+    $data = DB::table('game')->orderByRaw('TIME(game_close_time) ASC')->get();
     if ($data->isNotEmpty()){
         foreach ($data as $game) {
             $game->game_image = url($game->game_image);
@@ -134,6 +134,37 @@ public function bets(Request $request){
         ], 200);
     }
 
+	  $date = now()->setTimezone('Asia/Kolkata')->toDateString();
+	  $currentTimes = Carbon::now('Asia/Kolkata')->format('H:i:s');
+			$game_result_time = Carbon::parse(DB::table('game')->where('id', $gameid)->value('game_result_time'))->format('H:i:s');
+			$gameNamess = [
+				1 => "MOHALI",
+				2 => "ROYAL CHALLENGE",
+				3 => "GHAZIABAD",
+				4 => "GURGAON",
+				5 => "DHAN KUBER",
+				6 => "DELHI BAZAR",
+				7 => "SHRI GANESH",
+				8 => "FARIDABAD",
+				9 => "GALI",
+				10 => "DESAWAR"
+			];
+			$gameNameID = $gameNamess[$gameid] ?? "Unknown Game";
+			$numberwins = DB::table('chart_results')->whereDate('date', $date)->where('gamename', $gameNameID)->value('result');
+
+			if ((empty($numberwins) || $numberwins == '--') && $currentTimes > $game_result_time) {
+				return response()->json([
+					'status' => 400,
+					'message' => 'Bet closed until result is declared.',
+				]);
+			}
+
+	
+	
+	
+	
+	
+	
     $bets = json_decode($request->json, true);
     if (!is_array($bets)) {
         return response()->json([
@@ -144,27 +175,47 @@ public function bets(Request $request){
 
     $betsData = [];
     $totalAmount = array_sum(array_column($bets, 'amount'));
-    $user = DB::table('users')->where('id', $user_id)->first();
-    $walletBalance = $user->wallet ?? 0;
-    $bonusBalance = $user->bonus ?? 0;
+	
+	
+	
+	
+  $user = DB::table('users')->where('id', $user_id)->first();
+		$wallet = max(0, $user->wallet ?? 0);
+		$bonus = max(0, $user->bonus ?? 0);
+		$commission = max(0, $user->commission ?? 0);
+		$winning_wallet = max(0, $user->winning_wallet ?? 0);
 
-    if (($walletBalance + $bonusBalance) < $totalAmount) {
-        return response()->json([
-            'status' => 400,
-            'message' => "Insufficient balance"
-        ], 200);
-    }
+		$totalAvailable = $wallet + $bonus + $commission + $winning_wallet;
 
-    // Deduct from bonus first, then wallet
-    $remainingAmount = $totalAmount;
-    $bonusUsed = min($bonusBalance, $remainingAmount);
-    $remainingAmount -= $bonusUsed;
-    $walletUsed = $remainingAmount;
+		if ($totalAvailable < $totalAmount) {
+			return response()->json([
+				'status' => 400,
+				'message' => "Insufficient balance"
+			], 200);
+		}
 
-    DB::table('users')->where('id', $user_id)->update([
-        'bonus' => $bonusBalance - $bonusUsed,
-        'wallet' => $walletBalance - $walletUsed
-    ]);
+		// Deduct in order: wallet → bonus → commission → winning_wallet
+		$remaining = $totalAmount;
+
+		$walletUsed = min($wallet, $remaining);
+		$remaining -= $walletUsed;
+
+		$bonusUsed = min($bonus, $remaining);
+		$remaining -= $bonusUsed;
+
+		$commissionUsed = min($commission, $remaining);
+		$remaining -= $commissionUsed;
+
+		$winningUsed = min($winning_wallet, $remaining);
+		$remaining -= $winningUsed;
+
+		// Update user balances (never negative)
+		DB::table('users')->where('id', $user_id)->update([
+			'wallet' => DB::raw("GREATEST(wallet - $walletUsed, 0)"),
+			'bonus' => DB::raw("GREATEST(bonus - $bonusUsed, 0)"),
+			'commission' => DB::raw("GREATEST(commission - $commissionUsed, 0)"),
+			'winning_wallet' => DB::raw("GREATEST(winning_wallet - $winningUsed, 0)"),
+		]);
 
     if ($game_type == 1) {
         $newSerialNo = DB::table('betlog')->where('game_id', $gameid)->max('game_serial_no') ?? 0;
@@ -178,20 +229,24 @@ public function bets(Request $request){
                 ->where('game_serial_no', $newSerialNo)
                 ->first();
 
-            if ($existingBet) {
-                DB::table('betlog')
-                    ->where('id', $existingBet->id)
-                    ->increment('amount', $amount);
-            } else {
-                DB::table('betlog')->insert([
-                    'game_id' => $gameid,
-                    'game_serial_no' => $newSerialNo,
-                    'amount' => $amount,
-                    'number' => $number,
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
-            }
+          if ($existingBet) {
+				DB::table('betlog')
+					->where('id', $existingBet->id)
+					->update([
+						'amount' => DB::raw('amount + ' . $amount),
+						'created_at' => $currentTime,
+						'updated_at' => $currentTime
+					]);
+			} else {
+				DB::table('betlog')->insert([
+					'game_id' => $gameid,
+					'game_serial_no' => $newSerialNo,
+					'amount' => $amount,
+					'number' => $number,
+					'created_at' => $currentTime,
+					'updated_at' => $currentTime
+				]);
+			}
 
             $betsData[] = [
                 'user_id' => $user_id,
@@ -224,21 +279,24 @@ public function bets(Request $request){
                 ->where('number', $number)
                 ->first();
 
-            if ($existingBet) {
-                DB::table('crossing_betlog')
-                    ->where('game_id', $gameid)
-                    ->where('number', $number)
-                    ->increment('amount', $amount);
-            } else {
-                DB::table('crossing_betlog')->insert([
-                    'game_id' => $gameid,
-                    'game_serial_no' => $newSerialNo,
-                    'amount' => $amount,
-                    'number' => $number,
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
-            }
+          	 if ($existingBet) {
+				DB::table('crossing_betlog')
+					->where('id', $existingBet->id)
+					->update([
+						'amount' => DB::raw('amount + ' . $amount),
+						'created_at' => $currentTime,
+						'updated_at' => $currentTime
+					]);
+			} else {
+				DB::table('crossing_betlog')->insert([
+					'game_id' => $gameid,
+					'game_serial_no' => $newSerialNo,
+					'amount' => $amount,
+					'number' => $number,
+					'created_at' => $currentTime,
+					'updated_at' => $currentTime
+				]);
+			}
 
             $betsData[] = [
                 'user_id' => $user_id,
@@ -270,23 +328,27 @@ public function bets(Request $request){
                 ->where('game_id', $gameid)
                 ->where('number', $number)
                 ->first();
-
-            if ($existingBet) {
-                DB::table('andar_bahar_betlog')
-                    ->where('game_id', $gameid)
-                    ->where('number', $number)
-                    ->increment('amount', $amount);
-            } else {
-                DB::table('andar_bahar_betlog')->insert([
-                    'game_id' => $gameid,
-                    'game_serial_no' => $newSerialNo,
-                    'amount' => $amount,
-                    'number' => $number,
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
-            }
-
+			
+			 if ($existingBet) {
+				DB::table('andar_bahar_betlog')
+					->where('id', $existingBet->id)
+					->update([
+						'amount' => DB::raw('amount + ' . $amount),
+						'created_at' => $currentTime,
+						'updated_at' => $currentTime
+					]);
+			} else {
+				DB::table('andar_bahar_betlog')->insert([
+					'game_id' => $gameid,
+					'game_serial_no' => $newSerialNo,
+					'amount' => $amount,
+					'number' => $number,
+					'created_at' => $currentTime,
+					'updated_at' => $currentTime
+				]);
+			}
+			
+	
             $betsData[] = [
                 'user_id' => $user_id,
                 'game_id' => $gameid,
@@ -363,13 +425,14 @@ public function bets(Request $request){
 
    
     public function bethistory(Request $request){
+		
     $data = null;
     if ($request->game_type == 1) {
-        $data = DB::table('bets')->where('user_id', $request->user_id)->get();
+        $data = DB::table('bets')->where('user_id', $request->user_id)->orderBy('created_at', 'desc')->get();
     } elseif ($request->game_type == 2) {
-        $data = DB::table('cross_bets')->where('user_id', $request->user_id)->get();
+        $data = DB::table('cross_bets')->where('user_id', $request->user_id)->orderBy('created_at', 'desc')->get();
     } elseif ($request->game_type == 3) {
-        $data = DB::table('andarbahar_bets')->where('user_id', $request->user_id)->get();
+        $data = DB::table('andarbahar_bets')->where('user_id', $request->user_id)->orderBy('created_at', 'desc')->get();
     }
     if ($data && !$data->isEmpty()) {
         // Add game_type and live_game

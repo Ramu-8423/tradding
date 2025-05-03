@@ -24,14 +24,29 @@ class VendorActivityController extends Controller
         'screenshot' => 'required',
         'amount' => 'required'
     ]);
-
+    
     if ($validator->fails()) {
         return response()->json([
             'status' => 400,
             'message' => $validator->errors()->first(),
         ], 200);
     }
-   $imageBase64 = $request->screenshot;
+	   $mindeposite = DB::table('business_settings')->where('id',17)->value('longtext');
+	   $maxdeposite = DB::table('business_settings')->where('id',18)->value('longtext');
+	   if($request->amount < $mindeposite){
+				 return response()->json([
+                        'status' => 400,
+                        'message' => "'Minimum deposit  must be $mindeposite  or more.",  
+                    ], 200); 
+			}
+    		if($request->amount > $maxdeposite){
+    			 return response()->json([
+                            'status' => 400,
+                            'message' => "Maximum allowed deposit amount is $maxdeposite .",  
+                        ], 200); 
+    		}
+	   
+    $imageBase64 = $request->screenshot;
     $imageData = base64_decode($imageBase64);
     if ($imageData === false) {
         return response()->json([
@@ -135,98 +150,153 @@ class VendorActivityController extends Controller
 	 }
 	
 	
-	public function request_action(Request $request){
-		$validator = Validator::make($request->all(), [
-			'request_id' => 'required',
-			'status' => 'required',
-			'comment' => 'required_if:status,3|max:40',
-		]);
-			if($validator->fails()) {
-				return response()->json([
-					'status' => 400,
-					'message' => $validator->errors()->first(),
-				], 200);
-			}
-		$request_id = $request->request_id;
-		$status = $request->status;
-		$request_info =DB::table('vendor_request')->where('id', $request_id)->first();
-		$vendor_id = $request_info->vendor_id;
-		$user_id = $request_info->user_id;
-		$now_status = $request_info->status;
-		$amount = $request_info->request_amount;
-		$vendor_info =DB::table('users')->where('id', $vendor_id)->first();
-		$vendor_current_wallet = $vendor_info->wallet;
-		$commision = ($amount * 8) / 100;
-		if($status ==2){
-			if($vendor_current_wallet < $amount){
-						  return response()->json([
-							'status' => 200,
-							'message' => 'Insuficant balance plsease recharge',
-				],200);
-			}
-			//dd($now_status);
-				if ($now_status == 2) {
-					return response()->json([
-						'status' => 400,
-						'message' => 'The amount has already been transferred.',
-					], 200);
-				}
-               $vendor_wallet = DB::table('users')->where('id', $vendor_id)->value('wallet');
-			
-				if ($vendor_wallet >= $amount) {
-					$deduct = DB::table('users')->where('id', $vendor_id)->decrement('wallet', $amount);
-					if ($deduct) {
-						DB::table('users')->where('id', $vendor_id)->increment('commission', $commision);
-						DB::table('users')->where('id', $user_id)->increment('wallet', $amount);
+public function request_action(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'request_id' => 'required',
+        'status' => 'required',
+        'comment' => 'required_if:status,3|max:40',
+    ]);
 
-						DB::table('wallet_histories')->insert([
-							"user_id" => $vendor_id,
-							"amount"  => $amount,
-							"type_id" => 31,
-							"description" => "Transferred to the User",
-						]);
+    if ($validator->fails()) {
+        return response()->json([
+            'status' => 400,
+            'message' => $validator->errors()->first(),
+        ], 200);
+    }
 
-						DB::table('wallet_histories')->insert([
-							"user_id" => $vendor_id,
-							"amount"  => $commision,
-							"type_id" => 34,
-							"description" => "User transfer commission",
-						]);
+    $request_id = $request->request_id;
+    $status = $request->status;
 
-						DB::table('wallet_histories')->insert([
-							"user_id" => $user_id,
-							"amount"  => $amount,
-							"type_id" => 33,
-							"description" => "Amount received from vendor",
-						]);
+    $request_info = DB::table('vendor_request')->where('id', $request_id)->first();
+    $vendor_id = $request_info->vendor_id;
+    $user_id = $request_info->user_id;
+    $request_amount = $request_info->request_amount;
 
-						DB::table('vendor_request')->where('id', $request_id)->update([
-							"status" => 2,
-						]);
+    $user_info = DB::table('users')->where('id', $user_id)->first();
+    $referrer_id = $user_info->referrer_id;
+    $first_recharge = $user_info->first_recharge;
 
-						return response()->json([
-							'status' => 200,
-							'message' => 'Transfer Successfully',
-						], 200);
-					}
-				}
+    $vendor_info = DB::table('users')->where('id', $vendor_id)->first();
+    $vendor_current_wallet = $vendor_info->wallet;
+    $now_status = $request_info->status;
+
+    $commission = ($request_amount * 8) / 100;
+    $lifetime_bonus = ($request_amount * 3) / 100;
+    $refer_bonus = ($request_amount * 6) / 100;
+    $first_bonus = ($request_amount * 10) / 100;
+
+    if ($status == 2) {
+        if ($vendor_current_wallet < $request_amount) {
+            return response()->json([
+                'status' => 200,
+                'message' => 'Insufficient balance, please recharge.',
+            ], 200);
+        }
+
+        if ($now_status == 2) {
+            return response()->json([
+                'status' => 400,
+                'message' => 'The amount has already been transferred.',
+            ], 200);
+        }
+
+        $vendor_wallet = DB::table('users')->where('id', $vendor_id)->value('wallet');
+
+        if ($vendor_wallet >= $request_amount) {
+            $deduct = DB::table('users')->where('id', $vendor_id)->decrement('wallet', $request_amount);
+            if ($deduct) {
+                DB::table('users')->where('id', $vendor_id)->increment('commission', $commission);
+
+                DB::table('users')->where('id', $user_id)->update([
+                    'wallet' => DB::raw("wallet + $request_amount"),
+                    'total_payin' => DB::raw("total_payin + $request_amount"),
+                ]);
+
+                DB::table('wallet_histories')->insert([
+                    "user_id" => $vendor_id,
+                    "amount"  => $request_amount,
+                    "type_id" => 31,
+                    "description" => "Transferred to the User",
+                ]);
+
+                DB::table('wallet_histories')->insert([
+                    "user_id" => $vendor_id,
+                    "amount"  => $commission,
+                    "type_id" => 34,
+                    "description" => "User transfer commission",
+                ]);
+
+                DB::table('wallet_histories')->insert([
+                    "user_id" => $user_id,
+                    "amount"  => $request_amount,
+                    "type_id" => 33,
+                    "description" => "Amount received from vendor",
+                ]);
+
+                if ($first_recharge == 1) {
+                    DB::table('users')->where('id', $user_id)->update([
+                        'bonus' => DB::raw("bonus + $first_bonus"),
+                        'first_recharge' => 0
+                    ]);
+
+                    if ($referrer_id !== null) {
+                        DB::table('users')->where('id', $referrer_id)->update([
+                            'bonus' => DB::raw("bonus + $refer_bonus")
+                        ]);
+
+                        DB::table('wallet_histories')->insert([
+                            "user_id" => $referrer_id,
+                            "amount" => $refer_bonus,
+                            "type_id" => "30",
+                            "description" => "Referral Bonus"
+                        ]);
+                    }
+
+                    DB::table('wallet_histories')->insert([
+                        "user_id" => $user_id,
+                        "amount" => $first_bonus,
+                        "type_id" => "37",
+                        "description" => "First recharge bonus"
+                    ]);
+                } else {
+                    DB::table('users')->where('id', $user_id)->update([
+                        'bonus' => DB::raw("bonus + $lifetime_bonus")
+                    ]);
+
+                    DB::table('wallet_histories')->insert([
+                        "user_id" => $user_id,
+                        "amount" => $lifetime_bonus,
+                        "type_id" => "30",
+                        "description" => "Lifetime Bonus"
+                    ]);
+                }
+
+                DB::table('vendor_request')->where('id', $request_id)->update([
+                    "status" => 2,
+                ]);
+
+                return response()->json([
+                    'status' => 200,
+                    'message' => 'Transfer Successfully',
+                ], 200);
+            }
+        }
+    } elseif ($status == 3) {
+        $description = $request->comment;
+        DB::table('vendor_request')->where('id', $request_id)->update([
+            "status" => 3,
+            "description" => $description,
+        ]);
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'Rejected Successfully',
+        ], 200);
+    }
+}
 
 
-		if($status ==3){
-			$description = $request->comment;
-			DB::table('vendor_request')->where('id', $request_id)->update([
-					"status" => 3,
-				    "description" => $description,
-				 ]);
-		}
-		
-		  return response()->json([
-				'status' => 200,
-				'message' => 'Rejectted Successfully',
-				],200);
-	
-   }
-	}
 	
 	public function user_request_history($user_id) {
     $data = DB::table('vendor_request')

@@ -30,7 +30,7 @@ class PayingController extends Controller{
  public function payin(Request $request){
     $validator = Validator::make($request->all(), [
         'user_id' => 'required|exists:users,id',
-        'cash' => 'required|numeric',
+        'cash' => 'required|numeric|',  
         'type' => 'required|in:1', // only INR supported
     ]);
     $validator->stopOnFirstFailure();
@@ -41,7 +41,7 @@ class PayingController extends Controller{
             'message' => $validator->errors()->first()
         ]);
     }
-
+   
     $cash = $request->cash;
     $type = $request->type;
     $userid = $request->user_id;
@@ -67,7 +67,32 @@ class PayingController extends Controller{
             'message' => 'USDT is not supported!'
         ]);
     }
-
+	  $role_id = $user->role_id;
+	 $vendor_amount = DB::table('business_settings')->where('id',20)->value('longtext');
+	 $mindeposite = DB::table('business_settings')->where('id',17)->value('longtext');
+	 if ($role_id == 4) {
+	     if($cash < $mindeposite){
+				 return response()->json([
+                        'status' => 200,
+                        'message' => "'Minimum deposit  must be $mindeposite  or more.",  
+                    ], 200); 
+			}
+	}
+	 
+	 if ($role_id == 2 || $role_id == 3) {
+		if ($cash < $vendor_amount) {
+			return response()->json([
+				'status' => 200,
+		     	'message' => "Minimum recharge is $vendor_amount for vendors.",
+			],200);
+		}
+	}
+      
+	 
+	 
+	 
+	 
+	 
     $redirect_url = "https://root.mahajong.club/api/checkPayment?order_id=$orderid";
     // config('payment.indianpay.redirect_base_url') . $orderid;
 

@@ -25,7 +25,7 @@
                                     <tr>
                                         <th>Serial.No</th>
                                         <th>Game Name</th>
-                                        <th>Yesterday Result</th>
+                                       
                                         <th>Website Result Time</th>
                                         <th>Real Result Time</th>
                                         <th>Today Result</th>
@@ -38,7 +38,7 @@
                                     <tr>
                                         <td>{{ $index + 1 }}</td>
                                         <td>{{ $item['gamename'] }}</td>
-                                        <td>{{ $item['yesterday_number'] }}</td>
+                                        
                                         <td>{{ str_replace('at ', '', $item['result_time']) }}</td>
 
                                         <td> 

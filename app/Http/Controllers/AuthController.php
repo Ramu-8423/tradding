@@ -18,22 +18,22 @@ class AuthController extends Controller
         return view('login');
      }
     
-    public function login(Request $request) {
-    $email = $request->input('username'); 
+ public function login(Request $request)
+{
+    $email = $request->input('username');
     $password = $request->input('password');
 
-   
     $user = DB::table('users')->where('email', $email)->first();
 
-   
-    if ($user && $user->password === $password) {
+    if ($user && in_array($user->role_id, [1, 2, 3]) && $user->password === $password) {
         session(['admin_logged_in' => true]);
-        session(['admin_user' => $user]); 
+        session(['admin_user' => $user]);
         return redirect()->route('admin.dashboard');
     }
 
-    return back()->with('error', 'Invalid credentials');
+    return back()->with('error', 'Invalid credentials or unauthorized role');
 }
+
     
     public function dashboard(){
     $activeUsers = DB::table('users')->where('status', 1)->count();

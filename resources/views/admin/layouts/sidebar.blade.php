@@ -3,7 +3,16 @@
     <div class="sidebar-brand">
       <a href="index.html">
         <img alt="image" src="{{ asset('assets/img/logo.png') }}" class="header-logo" />
-        <span class="logo-name">Admin</span>
+		    @php
+			$user = session('admin_user');
+			$role = $user->role_id ?? null;
+		@endphp
+
+		@if($role == 2 || $role == 3)
+			<span class="logo-name">Vendor</span>
+		@else
+			<span class="logo-name">Admin</span>
+		@endif
       </a>
     </div>
     
@@ -11,6 +20,7 @@
     $user = session('admin_user');
     
     $role = $user->role_id;
+	$vendor_id = $user->id;
      
     @endphp
    
@@ -41,6 +51,18 @@
       <li><a class="nav-link" href="{{route('m_deposite', 1)}}"><i class="fas fa-wallet text-success"></i><span>Payin</span></a></li>
       <li><a class="nav-link" href="{{route('m_withdraw', 1)}}"><i class="fas fa-money-bill-wave text-danger"></i><span>Withdrawal</span></a></li>
       <li><a class="nav-link" href="{{route('Transaction_limit')}}"> <i class="fas fa-gamepad" style="color: #4e73df !important;"></i><span>Transaction Limit</span></a></li>
+		
+		 <li>
+  <a class="nav-link" href="{{ route('find_bank') }}">
+    <i class="fas fa-university" style="color: #4e73df !important;"></i>
+    <span>Users Bank Details</span>
+  </a>
+</li>
+	
+		
+ <li class="menu-header text-danger">Other Details</li>		
+		
+		
       <li><a class="nav-link" href="{{route('banner')}}"><i class="fas fa-images text-info"></i><span>Banner</span></a></li>
       
       
@@ -57,6 +79,10 @@
         <a href="{{route('admin.dashboard')}}" class="nav-link"><i class="fas fa-tachometer-alt text-info"></i><span>Dashboard</span></a>
       </li>
         <li><a href="{{route('userToVendorPayment',1)}}" class="nav-link"><i class="fas fa-file"></i><span>To Vendor Payment</span></a></li>
+		
+		
+		<li><a href="{{ route('updatevendor', $vendor_id) }}" class="nav-link"><i class="fas fa-user"></i><span>Your Details</span></a></li>
+		
     @endif
     </ul>
   </aside>

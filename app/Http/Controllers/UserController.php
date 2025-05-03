@@ -16,7 +16,7 @@ public function users($status) {
     return view('user.users')
            ->with('data', $data)
            ->with('status', $status)
-           ->with('role_id', 0);
+           ->with('role_id', 4);
 }
 
 public function vendor($status) {
@@ -29,7 +29,7 @@ public function vendor($status) {
     return view('user.users')
            ->with('data', $data)
            ->with('status', $status)
-           ->with('role_id', [2,3]);
+           ->with('role_id', 2);
 }
 
 
@@ -91,7 +91,7 @@ public function toggle_status(Request $request) {
    public function users_activity(Request $request , $userid){
       $game_type = $request->game_type;
       $paying = DB::table('payins')->where('user_id' , $userid)->select('amount','transaction_id','status','created_at')->orderByDesc('created_at')->get();
-      $withdraws = DB::table('withdraws')->where('user_id' , $userid)->select('amount','order_id','status','created_at')->orderByDesc('created_at')->get();
+      $withdraws = DB::table('withdraw_histories')->where('user_id' , $userid)->select('amount','order_id','status','created_at')->orderByDesc('created_at')->get();
       if($request->game_type == 1){
           $bets = DB::table('bets')->where('user_id' , $userid)->select('id','game_id','amount','status','number','win_amount','created_at', DB::raw("'Jodi' as game_type"))->orderByDesc('created_at')->get();
       }
@@ -118,9 +118,8 @@ public function toggle_status(Request $request) {
              $bets = $bets->sortByDesc('created_at')->values();
       }
       //dd($paying,$withdraws,$bets,$cross_bets,$andarbahar_bets);
-       return view('user.Activity', compact('paying', 'withdraws', 'bets','userid', 'game_type'));
-
-      
+      return view('user.Activity', compact('paying', 'withdraws', 'bets','userid', 'game_type'));
+ 
    }
 
 }

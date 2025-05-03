@@ -168,11 +168,30 @@ class PublicApiController extends Controller
 	
 	
     
- public function profile($id){
+public function profile($id){
     $data = DB::table('users')->where('id', $id)->first();
 
-    // Wallet me bonus add kar do, but bonus field ko waise hi rehne do
-    $data->wallet = ($data->wallet ?? 0) + ($data->bonus ?? 0);
+    if (!$data) {
+        return response()->json([
+            'status' => 404,
+            'message' => 'User Not found',
+        ], 200);
+    }
+
+    // Total wallet calculation (without modifying original wallet)
+   $data->total_wallet = round(
+    ($data->wallet ?? 0) + 
+    ($data->bonus ?? 0) + 
+    ($data->commission ?? 0) + 
+    ($data->winning_wallet ?? 0), 2
+);
+
+    // Keep original wallet as-is
+    $data->wallet = round($data->wallet ?? 0, 2);
+	$data->bonus = round($data->bonus ?? 0, 2);
+	$data->commission = round($data->commission ?? 0, 2);
+	$data->winning_wallet = round($data->winning_wallet ?? 0, 2);
+    $data->total_payin = round($data->total_payin ?? 0, 2);
     $user = DB::table('users')
         ->where('id', $id)
         ->select('name', 'email', 'address', 'dob')
@@ -183,37 +202,21 @@ class PublicApiController extends Controller
     $data->presentdata = $presentdata; 
 
     $referrer_id = $data->referrer_id;
-	//dd($referrer_id);
-	 
-	 $vendorId = $this->getVendorId($referrer_id) ?? 2;  // if null then admin vendor id 2 set for admin vendor
-	// dd($vendorId);
-	 //dd($vendorId);
-	 
+    $vendorId = $this->getVendorId($referrer_id) ?? 2;
+
     $vendor_info = DB::table('users')->where('id', $vendorId)->first();
 
-    $vendor_upi_id = $vendor_info->vendor_upi_id ?? null;
-    $vendor_qr  = $vendor_info->vendor_qr ?? null;
-    $vendor_role  = $vendor_info->role_id ?? null;
-    $vendor_id  = $vendor_info->id ?? null;
+    $data->vendor_upi_id = $vendor_info->vendor_upi_id ?? null;
+    $data->vendor_qr = url('/') . '/' . ($vendor_info->vendor_qr ?? '');
+    $data->vendor_id = $vendor_info->id ?? null;
+    $data->vendor_role = $vendor_info->role_id ?? null;
 
-    $data->vendor_upi_id = $vendor_upi_id;
-    $data->vendor_qr = url('/') . '/' . $vendor_qr;
-    $data->vendor_id = $vendor_id;
-    $data->vendor_role = $vendor_role;
-	 
-
-    if($data){
-        return response()->json([
-            'status' => 200,
-            'data' => $data,
-        ], 200);
-    } else {
-        return response()->json([
-            'status' => 400,
-            'message' => 'no data'
-        ], 200);  
-    }
+    return response()->json([
+        'status' => 200,
+        'data' => $data,
+    ], 200);
 }
+
 
     public function register(Request $request){
         $validator = Validator::make($request->all(), [
@@ -432,7 +435,25 @@ class PublicApiController extends Controller
             ], 200);  
            }
         }
-    
+	
+		public function version() {
+		$data = DB::table('settings')->where('id', 11)->select('description','link')->first();
+		if ($data) {
+			// Rename 'description' to 'version'
+			$data->version = $data->description;
+			unset($data->description);
+			return response()->json([
+				'status' => 200,
+				'data' => $data,
+			], 200);
+		} else {
+			return response()->json([
+				'status' => 400,
+				'data' => [],
+			], 200);
+		}
+	}
+
         public function  notifications(){
         $data = DB::table('notifications')->get();
         if($data){

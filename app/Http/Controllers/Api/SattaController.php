@@ -8,7 +8,6 @@ use Carbon\Carbon;
 use DB;
 
 class SattaController extends Controller{
-    
    public function chart_result($id){
 		  $allowedGames = [
 				"MOHALI", "ROYAL CHALLENGE", "GHAZIABAD",
@@ -128,7 +127,7 @@ class SattaController extends Controller{
            
             foreach ($bets as $bet) {
                 $isWinner = ($bet->number == $winningNumber);
-                $winAmount = $isWinner ? ($bet->amount * 7) : 0;
+                $winAmount = $isWinner ? ($bet->amount * 9) : 0;
         
                 DB::table('bets')
                     ->where('id', $bet->id)
@@ -160,7 +159,7 @@ class SattaController extends Controller{
            // dd($cross_bets);
             foreach ($cross_bets as $betss) {
                 $isWinners = ($betss->number == $winningNumber);
-                $winAmounts = $isWinners ? ($betss->amount * 7) : 0;
+                $winAmounts = $isWinners ? ($betss->amount * 9) : 0;
                 DB::table('cross_bets')
                     ->where('id', $betss->id)
                     ->update([
@@ -192,7 +191,7 @@ class SattaController extends Controller{
            // dd($cross_bets);
             foreach ($andarbahar_bets as $betss) {
                 $isWinners = ($betss->number == $winningNumber);
-                $winAmounts = $isWinners ? ($betss->amount * 7) : 0;
+                $winAmounts = $isWinners ? ($betss->amount * 9) : 0;
                 DB::table('andarbahar_bets')
                     ->where('id', $betss->id)
                     ->update([
@@ -222,122 +221,124 @@ class SattaController extends Controller{
 
 	}   
 	
-public function manual_result(Request $request)
-{
-    $id = $request->id;
-    $result = $request->result;
+		public function manual_result(Request $request)
+		{
+			$id = $request->id;
+			$result = $request->result;
+             if (!is_numeric($result) || strlen($result) !== 2) {
+				  return back()->with('error', 'The result must be a 2-digit number.');
+			}
+			$game_info = DB::table('chart_results')->where('id', $id)->first();
+			$gamename = $game_info->gamename;
 
-    $game_info = DB::table('chart_results')->where('id', $id)->first();
-    $gamename = $game_info->gamename;
+			$gameNamess = [
+				1 => "MOHALI",
+				2 => "ROYAL CHALLENGE",
+				3 => "GHAZIABAD",
+				4 => "GURGAON",
+				5 => "DHAN KUBER",
+				6 => "DELHI BAZAR",
+				7 => "SHRI GANESH",
+				8 => "FARIDABAD",
+				9 => "GALI",
+				10 => "DESAWAR"
+			];
 
-    $gameNamess = [
-        1 => "MOHALI",
-        2 => "ROYAL CHALLENGE",
-        3 => "GHAZIABAD",
-        4 => "GURGAON",
-        5 => "DHAN KUBER",
-        6 => "DELHI BAZAR",
-        7 => "SHRI GANESH",
-        8 => "FARIDABAD",
-        9 => "GALI",
-        10 => "DESAWAR"
-    ];
+			$date = now()->setTimezone('Asia/Kolkata')->toDateTimeString();
+			$gameId = array_flip($gameNamess)[$gamename] ?? "Unknown ID";
 
-    $date = now()->setTimezone('Asia/Kolkata')->toDateTimeString();
-    $gameId = array_flip($gameNamess)[$gamename] ?? "Unknown ID";
-
-    $insert = DB::table('chart_results')->where('id', $id)->update([
-        "result" => $result,
-        "updated_at" => $date
-    ]);
-
-    if ($insert) {
-        $winningNumber = DB::table('chart_results')->where('id', $id)->value('result');
-        $serialNo1 = DB::table('betlog')->where('game_id', $gameId)->max('game_serial_no');
-        $newSerialNo1 = $serialNo1 + 1;
-        $bets = DB::table('bets')->where('game_id', $gameId)->where('game_serial_no', $serialNo1)->get();
-        foreach ($bets as $bet) {
-            $isWinner = ($bet->number == $winningNumber);
-            $winAmount = $isWinner ? ($bet->amount * 7) : 0;
-            DB::table('bets')->where('id', $bet->id)->update([
-                'win_amount' => $winAmount,
-                'win_number' => $winningNumber,
-                'status' => $isWinner ? 2 : 3,
-                'updated_at' => now()
-            ]);
-
-            if ($isWinner && $winAmount > 0) {
-                DB::table('users')->where('id', $bet->user_id)->increment('winning_wallet', $winAmount);
-            }
-        }
-
-        DB::table('betlog')->where('game_id', $id)->update([
-            'amount' => 0,
-            'game_serial_no' => $newSerialNo1
-        ]);
-
-        $serialNo2 = DB::table('crossing_betlog')->where('game_id', $gameId)->max('game_serial_no');
-        $newSerialNo2 = $serialNo2 + 1;
- 
-        $cross_bets = DB::table('cross_bets')->where('game_id', $gameId)->where('game_serial_no', $serialNo2)->get();
-		//dd($serialNo2,$cross_bets);
-        foreach ($cross_bets as $betss) {
-            $isWinners = ($betss->number == $winningNumber);
-            $winAmounts = $isWinners ? ($betss->amount * 7) : 0;
-            DB::table('cross_bets')->where('id', $betss->id)->update([
-                'win_amount' => $winAmounts,
-                'win_number' => $winningNumber,
-                'status' => $isWinners ? 2 : 3,
-                'updated_at' => now()
-            ]);
-
-            if ($isWinners && $winAmounts > 0) {
-                DB::table('users')->where('id', $betss->user_id)->increment('winning_wallet', $winAmounts);
-            }
-        }
-
-        DB::table('crossing_betlog')->where('game_id', $gameId)->update([
-            'amount' => 0,
-            'game_serial_no' => $newSerialNo2
-        ]);
-
-        $serialNo3 = DB::table('andar_bahar_betlog')->where('game_id', $gameId)->max('game_serial_no');
-        $newSerialNo3 = $serialNo3 + 1;
-
-        $andarbahar_bets = DB::table('andarbahar_bets')->where('game_id', $gameId)->where('game_serial_no', $serialNo3)->get();
-		//dd($serialNo3, $andarbahar_bets);
-        foreach ($andarbahar_bets as $betss) {
-            $isWinners = ($betss->number == $winningNumber);
-            $winAmounts = $isWinners ? ($betss->amount * 7) : 0;
-            DB::table('andarbahar_bets')->where('id', $betss->id)->update([
-                'win_amount' => $winAmounts,
-                'win_number' => $winningNumber,
-                'status' => $isWinners ? 2 : 3,
-                'updated_at' => now()
-            ]);
-
-            if ($isWinners && $winAmounts > 0) {
-                DB::table('users')->where('id', $betss->user_id)->increment('winning_wallet', $winAmounts);
-            }
-        }
-
-        DB::table('andar_bahar_betlog')->where('game_id', $id)->update([
-            'amount' => 0,
-            'game_serial_no' => $newSerialNo3
-        ]);
-
-        return redirect()->back()->with([
-				'success' => 'Winners decided successfully',
-				'game_id' => $id,
-				'winning_number' => $winningNumber,
-				'new_game_serial_no_bets' => $newSerialNo1,
-				'new_game_serial_no_cross_bets' => $newSerialNo2,
-				'new_game_serial_no_andarbahar' => $newSerialNo3
+			$insert = DB::table('chart_results')->where('id', $id)->update([
+				"result" => $result,
+				"updated_at" => $date
 			]);
-		
-    }
-}
-	
-	}
+
+			if ($insert) {
+				$winningNumber = DB::table('chart_results')->where('id', $id)->value('result');
+				$serialNo1 = DB::table('betlog')->where('game_id', $gameId)->max('game_serial_no');
+				$newSerialNo1 = $serialNo1 + 1;
+				$bets = DB::table('bets')->where('game_id', $gameId)->where('game_serial_no', $serialNo1)->get();
+				foreach ($bets as $bet) {
+					$isWinner = ($bet->number == $winningNumber);
+					$winAmount = $isWinner ? ($bet->amount * 9) : 0;
+					DB::table('bets')->where('id', $bet->id)->update([
+						'win_amount' => $winAmount,
+						'win_number' => $winningNumber,
+						'status' => $isWinner ? 2 : 3,
+						'updated_at' => now()
+					]);
+
+					if ($isWinner && $winAmount > 0) {
+						DB::table('users')->where('id', $bet->user_id)->increment('winning_wallet', $winAmount);
+					}
+				}
+
+				DB::table('betlog')->where('game_id', $id)->update([
+					'amount' => 0,
+					'game_serial_no' => $newSerialNo1
+				]);
+
+				$serialNo2 = DB::table('crossing_betlog')->where('game_id', $gameId)->max('game_serial_no');
+				$newSerialNo2 = $serialNo2 + 1;
+
+				$cross_bets = DB::table('cross_bets')->where('game_id', $gameId)->where('game_serial_no', $serialNo2)->get();
+				//dd($serialNo2,$cross_bets);
+				foreach ($cross_bets as $betss) {
+					$isWinners = ($betss->number == $winningNumber);
+					$winAmounts = $isWinners ? ($betss->amount * 9) : 0;
+					DB::table('cross_bets')->where('id', $betss->id)->update([
+						'win_amount' => $winAmounts,
+						'win_number' => $winningNumber,
+						'status' => $isWinners ? 2 : 3,
+						'updated_at' => now()
+					]);
+
+					if ($isWinners && $winAmounts > 0) {
+						DB::table('users')->where('id', $betss->user_id)->increment('winning_wallet', $winAmounts);
+					}
+				}
+
+				DB::table('crossing_betlog')->where('game_id', $gameId)->update([
+					'amount' => 0,
+					'game_serial_no' => $newSerialNo2
+				]);
+
+				$serialNo3 = DB::table('andar_bahar_betlog')->where('game_id', $gameId)->max('game_serial_no');
+				$newSerialNo3 = $serialNo3 + 1;
+
+				$andarbahar_bets = DB::table('andarbahar_bets')->where('game_id', $gameId)->where('game_serial_no', $serialNo3)->get();
+				//dd($serialNo3, $andarbahar_bets);
+				foreach ($andarbahar_bets as $betss) {
+					$isWinners = ($betss->number == $winningNumber);
+					$winAmounts = $isWinners ? ($betss->amount * 9) : 0;
+					DB::table('andarbahar_bets')->where('id', $betss->id)->update([
+						'win_amount' => $winAmounts,
+						'win_number' => $winningNumber,
+						'status' => $isWinners ? 2 : 3,
+						'updated_at' => now()
+					]);
+
+					if ($isWinners && $winAmounts > 0) {
+						DB::table('users')->where('id', $betss->user_id)->increment('winning_wallet', $winAmounts);
+					}
+				}
+
+				DB::table('andar_bahar_betlog')->where('game_id', $id)->update([
+					'amount' => 0,
+					'game_serial_no' => $newSerialNo3
+				]);
+
+				return redirect()->back()->with([
+						'success' => 'Winners decided successfully',
+						'game_id' => $id,
+						'winning_number' => $winningNumber,
+						'new_game_serial_no_bets' => $newSerialNo1,
+						'new_game_serial_no_cross_bets' => $newSerialNo2,
+						'new_game_serial_no_andarbahar' => $newSerialNo3
+					]);
+
+			}
+		}
+
+			}
 
 

@@ -70,8 +70,7 @@
                     <th>Game Serial No</th>
                     <th>Number</th>
                     <th>Amount</th>
-                    <th>Created At</th>
-                    <th>Updated At</th>
+                    <th>Date</th>
                 </tr>
             </thead>
             <tbody>
@@ -95,7 +94,6 @@
                     <td>{{ $item->game_serial_no }}</td>
                     <td>{{ $item->number }}</td>
                     <td>{{ $item->amount }}</td>
-                    <td>{{ $item->created_at }}</td>
                     <td>{{ $item->updated_at }}</td>
                 </tr>
                 @endforeach
